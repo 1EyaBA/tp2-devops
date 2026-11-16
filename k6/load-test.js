@@ -6,9 +6,9 @@ import { check, sleep } from 'k6';
 
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080';
 const FLAKY_SHARE = parseFloat(__ENV.FLAKY_SHARE || '0.01');   // part du trafic vers /flaky
-const CHECKOUT_SHARE = 0.3;
+const CHECKOUT_SHARE = 0.3;                                      // part du trafic vers /checkout
 const SCALE = parseFloat(__ENV.SCALE || '1');                    // ex. 0.3 sur une petite machine
-const vu = (n) => Math.max(1, Math.round(n * SCALE));                                      // part du trafic vers /checkout
+const vu = (n) => Math.max(1, Math.round(n * SCALE));            // nombre de VU ajusté
 
 export const options = {
   scenarios: {

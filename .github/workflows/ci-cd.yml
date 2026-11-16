@@ -6,12 +6,13 @@ on:
     paths-ignore: ["charts/catalog-api/values.yaml"]   # évite la boucle avec le commit GitOps
   pull_request:
     branches: [main]
+  workflow_dispatch:          # lancement manuel : gh workflow run ci-cd.yml --ref main
 
 env:
   IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/catalog-api
 
 jobs:
-  # 1) Lint & Test ------------------------------------------------------------
+  # 1) Lint & Test
   lint-test:
     runs-on: ubuntu-latest
     steps:
@@ -31,13 +32,11 @@ jobs:
           name: coverage
           path: coverage.xml
 
-  # 2) SonarQube Analysis & Quality Gate ---------------------------------------
+  # 2) SonarQube Analysis & Quality Gate
   sonarqube:
     needs: lint-test
-    # Tourne même si les tests ont échoué, pour voir le verdict de la Quality Gate
-    if: ${{ !cancelled() }}
-    # SonarQube tourne en local (Docker) : le job s'exécute sur un runner self-hosted
-    runs-on: self-hosted
+    if: ${{ !cancelled() }}     # tourne même si les tests échouent, pour voir le verdict de la gate
+    runs-on: self-hosted        # SonarQube est en local : runner installé sur ta machine
     steps:
       - uses: actions/checkout@v4
         with:
@@ -55,7 +54,7 @@ jobs:
             -Dsonar.qualitygate.wait=true
             -Dsonar.qualitygate.timeout=300
 
-  # 3) Build -> Trivy -> Push ----------------------------------------------------
+  # 3) Build -> Trivy -> Push
   build-scan-push:
     needs: [lint-test, sonarqube]   # il faut que les DEUX soient verts
     runs-on: ubuntu-latest
@@ -79,20 +78,20 @@ jobs:
           ignore-unfixed: true
           format: table
       - name: Login GHCR
-        if: github.event_name == 'push'
+        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Push vers GHCR
-        if: github.event_name == 'push'
+        if: github.event_name != 'pull_request'
         run: docker push $IMAGE_NAME:${{ steps.vars.outputs.tag }}
 
-  # 4) GitOps : mise à jour du tag dans Helm -> ArgoCD synchronise ------------------
+  # 4) GitOps : mise à jour du tag dans Helm -> ArgoCD synchronise
   update-manifest:
     needs: build-scan-push
-    if: github.event_name == 'push'
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: write
