@@ -1,0 +1,99 @@
+# SLO : 99.5 % de disponibilité -> Error Budget = 0.5 % (0.005)
+# Burn rate = taux d'erreur observé / 0.005
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: catalog-api-slo
+  namespace: observability
+spec:
+  groups:
+  - name: catalog-api-sli
+    interval: 30s
+    rules:
+    - record: sli:http_requests:rate5m
+      expr: sum(rate(http_requests_total{namespace="catalog",path!="/health"}[5m]))
+    - record: sli:http_errors:ratio_rate5m
+      expr: |-
+        (sum(rate(http_requests_total{namespace="catalog",path!="/health",status=~"5.."}[5m])) or vector(0))
+        /
+        sum(rate(http_requests_total{namespace="catalog",path!="/health"}[5m]))
+    - record: slo:burn_rate:5m
+      expr: sli:http_errors:ratio_rate5m / 0.005
+    - record: sli:http_requests:rate30m
+      expr: sum(rate(http_requests_total{namespace="catalog",path!="/health"}[30m]))
+    - record: sli:http_errors:ratio_rate30m
+      expr: |-
+        (sum(rate(http_requests_total{namespace="catalog",path!="/health",status=~"5.."}[30m])) or vector(0))
+        /
+        sum(rate(http_requests_total{namespace="catalog",path!="/health"}[30m]))
+    - record: slo:burn_rate:30m
+      expr: sli:http_errors:ratio_rate30m / 0.005
+    - record: sli:http_requests:rate1h
+      expr: sum(rate(http_requests_total{namespace="catalog",path!="/health"}[1h]))
+    - record: sli:http_errors:ratio_rate1h
+      expr: |-
+        (sum(rate(http_requests_total{namespace="catalog",path!="/health",status=~"5.."}[1h])) or vector(0))
+        /
+        sum(rate(http_requests_total{namespace="catalog",path!="/health"}[1h]))
+    - record: slo:burn_rate:1h
+      expr: sli:http_errors:ratio_rate1h / 0.005
+    - record: sli:http_requests:rate6h
+      expr: sum(rate(http_requests_total{namespace="catalog",path!="/health"}[6h]))
+    - record: sli:http_errors:ratio_rate6h
+      expr: |-
+        (sum(rate(http_requests_total{namespace="catalog",path!="/health",status=~"5.."}[6h])) or vector(0))
+        /
+        sum(rate(http_requests_total{namespace="catalog",path!="/health"}[6h]))
+    - record: slo:burn_rate:6h
+      expr: sli:http_errors:ratio_rate6h / 0.005
+    - record: sli:http_requests:rate30d
+      expr: sum(rate(http_requests_total{namespace="catalog",path!="/health"}[30d]))
+    - record: sli:http_errors:ratio_rate30d
+      expr: |-
+        (sum(rate(http_requests_total{namespace="catalog",path!="/health",status=~"5.."}[30d])) or vector(0))
+        /
+        sum(rate(http_requests_total{namespace="catalog",path!="/health"}[30d]))
+    - record: slo:burn_rate:30d
+      expr: sli:http_errors:ratio_rate30d / 0.005
+    - record: slo:availability:ratio_rate30d
+      expr: 1 - sli:http_errors:ratio_rate30d
+    - record: slo:error_budget_remaining:ratio30d
+      expr: 1 - (sli:http_errors:ratio_rate30d / 0.005)
+    - record: sli:http_latency:ratio_under_200ms_rate5m
+      expr: |-
+        sum(rate(http_request_duration_seconds_bucket{namespace="catalog",path!="/health",le="0.2"}[5m]))
+        /
+        sum(rate(http_request_duration_seconds_count{namespace="catalog",path!="/health"}[5m]))
+    - record: sli:http_latency:p95_rate5m
+      expr: histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{namespace="catalog",path!="/health"}[5m])))
+  - name: catalog-api-burn-rate-alerts
+    rules:
+    - alert: ErrorBudgetBurnRateCritical
+      expr: |-
+        slo:burn_rate:1h > 14.4
+        and
+        slo:burn_rate:5m > 14.4
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: catalog-api brûle l'Error Budget 14.4x trop vite (2 % du budget en 1 h)
+        description: Burn rate 1h = {{ $value | printf "%.1f" }}. A ce rythme, tout le budget mensuel est consommé en ~2 jours.
+    - alert: ErrorBudgetBurnRateWarning
+      expr: |-
+        slo:burn_rate:6h > 6
+        and
+        slo:burn_rate:30m > 6
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: catalog-api brûle l'Error Budget 6x trop vite (5 % du budget en 6 h)
+        description: Burn rate 6h = {{ $value | printf "%.1f" }}.
+    - alert: LatencySLOViolation
+      expr: sli:http_latency:p95_rate5m > 0.2
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: p95 de catalog-api au-dessus de 200 ms

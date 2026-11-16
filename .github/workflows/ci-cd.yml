@@ -1,0 +1,109 @@
+name: CI/CD catalog-api
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["charts/catalog-api/values.yaml"]   # évite la boucle avec le commit GitOps
+  pull_request:
+    branches: [main]
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/catalog-api
+
+jobs:
+  # 1) Lint & Test ------------------------------------------------------------
+  lint-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - name: Lint (ruff)
+        run: ruff check . && ruff format --check .
+      - name: Tests + couverture (échec si < 85 %)
+        run: pytest
+      - uses: actions/upload-artifact@v4
+        if: always()            # on envoie le rapport même si le seuil de 85 % échoue
+        with:
+          name: coverage
+          path: coverage.xml
+
+  # 2) SonarQube Analysis & Quality Gate ---------------------------------------
+  sonarqube:
+    needs: lint-test
+    # Tourne même si les tests ont échoué, pour voir le verdict de la Quality Gate
+    if: ${{ !cancelled() }}
+    # SonarQube tourne en local (Docker) : le job s'exécute sur un runner self-hosted
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: coverage
+      - name: Analyse SonarQube + attente du Quality Gate
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          args: >
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.timeout=300
+
+  # 3) Build -> Trivy -> Push ----------------------------------------------------
+  build-scan-push:
+    needs: [lint-test, sonarqube]   # il faut que les DEUX soient verts
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      tag: ${{ steps.vars.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: vars
+        run: echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+      - name: Build de l'image Docker
+        run: docker build -t $IMAGE_NAME:${{ steps.vars.outputs.tag }} .
+      - name: Scan Trivy (CRITICAL = échec)
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.tag }}
+          severity: CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+          format: table
+      - name: Login GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Push vers GHCR
+        if: github.event_name == 'push'
+        run: docker push $IMAGE_NAME:${{ steps.vars.outputs.tag }}
+
+  # 4) GitOps : mise à jour du tag dans Helm -> ArgoCD synchronise ------------------
+  update-manifest:
+    needs: build-scan-push
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Mettre à jour image.tag dans values.yaml
+        run: |
+          TAG=${{ needs.build-scan-push.outputs.tag }}
+          sed -i "s|^  tag: .*|  tag: \"$TAG\"|" charts/catalog-api/values.yaml
+          sed -i "s|^  repository: .*|  repository: $IMAGE_NAME|" charts/catalog-api/values.yaml
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git commit -am "chore(deploy): catalog-api $TAG [skip ci]" || echo "Rien à commiter"
+          git push

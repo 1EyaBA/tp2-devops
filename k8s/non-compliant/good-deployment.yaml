@@ -1,0 +1,20 @@
+# Le même manifeste corrigé : tag figé + requests/limits -> accepté
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: good-catalog
+  namespace: demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: good-catalog }
+  template:
+    metadata:
+      labels: { app: good-catalog }
+    spec:
+      containers:
+        - name: api
+          image: nginx:1.27.3
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: 200m, memory: 128Mi }

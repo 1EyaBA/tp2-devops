@@ -1,0 +1,16 @@
+.git
+.github
+tests
+k6
+charts
+gatekeeper
+k8s
+argocd
+observability
+kind
+demo
+**/__pycache__
+.pytest_cache
+.ruff_cache
+coverage.xml
+.coverage

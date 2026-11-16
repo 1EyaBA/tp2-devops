@@ -1,0 +1,17 @@
+# Manifeste volontairement NON conforme : tag latest + aucune ressource
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bad-catalog
+  namespace: demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: bad-catalog }
+  template:
+    metadata:
+      labels: { app: bad-catalog }
+    spec:
+      containers:
+        - name: api
+          image: nginx:latest

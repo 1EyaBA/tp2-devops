@@ -1,0 +1,9 @@
+# helm install tempo grafana/tempo -n observability -f ce-fichier
+tempo:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: "0.0.0.0:4317"
+        http:
+          endpoint: "0.0.0.0:4318"

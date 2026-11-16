@@ -1,0 +1,35 @@
+rule_files: [rules.yml]
+evaluation_interval: 30s
+tests:
+  # Incident : 15 % d'erreurs pendant 1h -> burn rate = 30 -> alerte critique
+  - interval: 30s
+    input_series:
+      - series: 'http_requests_total{namespace="catalog",path="/flaky",status="500"}'
+        values: '0+15x120'
+      - series: 'http_requests_total{namespace="catalog",path="/products",status="200"}'
+        values: '0+85x120'
+    alert_rule_test:
+      - eval_time: 60m
+        alertname: ErrorBudgetBurnRateCritical
+        exp_alerts:
+          - exp_labels: { severity: critical }
+            exp_annotations:
+              summary: "catalog-api brûle l'Error Budget 14.4x trop vite (2 % du budget en 1 h)"
+              description: "Burn rate 1h = 30.0. A ce rythme, tout le budget mensuel est consommé en ~2 jours."
+    promql_expr_test:
+      - expr: slo:burn_rate:1h
+        eval_time: 60m
+        exp_samples: [{ labels: 'slo:burn_rate:1h', value: 30 }]
+  # Trafic normal sans erreur : pas d'alerte, budget intact (grâce à "or vector(0)")
+  - interval: 30s
+    input_series:
+      - series: 'http_requests_total{namespace="catalog",path="/products",status="200"}'
+        values: '0+100x120'
+    alert_rule_test:
+      - eval_time: 60m
+        alertname: ErrorBudgetBurnRateCritical
+        exp_alerts: []
+    promql_expr_test:
+      - expr: slo:error_budget_remaining:ratio30d
+        eval_time: 60m
+        exp_samples: [{ labels: 'slo:error_budget_remaining:ratio30d', value: 1 }]

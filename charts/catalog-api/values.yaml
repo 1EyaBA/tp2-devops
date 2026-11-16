@@ -1,0 +1,27 @@
+replicaCount: 2
+
+image:
+  repository: ghcr.io/1eyaba/catalog-api
+  tag: "CHANGE_ME"   # mis à jour automatiquement par la CI (SHA du commit)
+  pullPolicy: IfNotPresent
+
+service:
+  type: NodePort
+  port: 80
+  targetPort: 8000
+  nodePort: 30080
+
+# Obligatoire à cause de la contrainte OPA Gatekeeper n°2
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+env:
+  OTEL_SERVICE_NAME: catalog-api
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector.observability.svc.cluster.local:4318
+  FLAKY_ERROR_RATE: "0.2"
+  CHECKOUT_SLOW_PROB: "0.05"
