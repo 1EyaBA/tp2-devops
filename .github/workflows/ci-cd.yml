@@ -45,7 +45,7 @@ jobs:
         with:
           name: coverage
       - name: Analyse SonarQube + attente du Quality Gate
-        uses: SonarSource/sonarqube-scan-action@v5
+        uses: SonarSource/sonarqube-scan-action@v6
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
@@ -70,7 +70,7 @@ jobs:
       - name: Build de l'image Docker
         run: docker build -t $IMAGE_NAME:${{ steps.vars.outputs.tag }} .
       - name: Scan Trivy (CRITICAL = échec)
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.tag }}
           severity: CRITICAL
