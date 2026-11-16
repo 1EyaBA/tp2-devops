@@ -9,7 +9,7 @@ on:
   workflow_dispatch:          # lancement manuel : gh workflow run ci-cd.yml --ref main
 
 env:
-  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/catalog-api
+  IMAGE_NAME: ghcr.io/1eyaba/catalog-api
 
 jobs:
   # 1) Lint & Test
