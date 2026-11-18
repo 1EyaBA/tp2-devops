@@ -23,5 +23,5 @@ resources:
 env:
   OTEL_SERVICE_NAME: catalog-api
   OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector.observability.svc.cluster.local:4318
-  FLAKY_ERROR_RATE: "0.2"
+  FLAKY_ERROR_RATE: "0.8"
   CHECKOUT_SLOW_PROB: "0.05"
