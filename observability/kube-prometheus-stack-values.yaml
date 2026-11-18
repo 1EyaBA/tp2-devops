@@ -60,7 +60,7 @@ grafana:
     - name: Tempo
       uid: tempo
       type: tempo
-      url: http://tempo.observability.svc.cluster.local:3100
+      url: http://tempo.observability.svc.cluster.local:3200
       jsonData:
         # Traces -> Logs : depuis une trace, ouvrir les logs qui ont le même trace_id
         tracesToLogsV2:
@@ -93,11 +93,11 @@ alertmanager:
       # "Page" : simulé par un webhook (ex. https://webhook.site/<votre-id>)
       - name: pager
         webhook_configs:
-          - url: https://webhook.site/REMPLACER-PAR-VOTRE-ID
+          - url: https://webhook.site/fed1570f-7f7e-442e-8031-0bddfd226afc
             send_resolved: true
       - name: slack
         slack_configs:
-          - api_url: https://hooks.slack.com/services/REMPLACER/PAR/VOTRE_WEBHOOK
+          - api_url: https://webhook.site/fed1570f-7f7e-442e-8031-0bddfd226afc
             channel: "#alerts"
             send_resolved: true
             title: '[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}'
