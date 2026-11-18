@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 from app import catalog
 from app.telemetry import setup_logging, setup_telemetry
 
-app = FastAPI(title="Catalog API", version="1.0.0")
+app = FastAPI(title="Catalog API", version="1.1.0")
 logger = setup_logging()
 setup_telemetry(app)
 
