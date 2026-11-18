@@ -2,7 +2,7 @@ replicaCount: 2
 
 image:
   repository: ghcr.io/1eyaba/catalog-api
-  tag: "79546bc"
+  tag: "f4cb5b4"
   pullPolicy: IfNotPresent
 
 service:
